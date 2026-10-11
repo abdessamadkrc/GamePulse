@@ -1,0 +1,55 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gamepulse
+      POSTGRES_PASSWORD: gamepulse
+      POSTGRES_DB: gamepulse
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gamepulse -d gamepulse"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # One-shot job: generates the synthetic dataset + derived tables (skips if already seeded).
+  seed:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["python", "-m", "seed.generate"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://gamepulse:gamepulse@db:5432/gamepulse
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg2://gamepulse:gamepulse@db:5432/gamepulse
+      CORS_ORIGINS: http://localhost:3000
+      ALLOW_IMPORT: "1"   # set to "0" to disable uploading data from the browser
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        API_INTERNAL_URL: http://backend:8000
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

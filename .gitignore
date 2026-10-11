@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.log
+npm-install.log
+frontend/tsconfig.tsbuildinfo
+sample_data/*.csv
